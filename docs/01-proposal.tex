@@ -1,0 +1,73 @@
+\documentclass[12pt]{article}
+\usepackage{hyperref}
+\usepackage[margin=3cm]{geometry}
+
+\title{\vspace{-6ex}Deliverable 1 - Data Selection Proposal}
+\author{Sheheryar Parvaz}
+\date{October 5th 2020}
+
+\begin{document}
+\maketitle
+
+\section{Dataset}
+The main dataset will be a kaggle dataset of images of the American Sign
+Language (ASL) alphabet\cite{data-images}. This dataset contains 87 000
+images, with 26 classes for the letters and three more for space,
+delete, and nothing.
+
+There is also a secondary dataset of recordings of participants saying
+words in ASL\cite{data-videos}. The task of interpreting sign language
+in motion is much more complex, and tackling it is only intended as a
+stretch goal if I have enough time.
+
+\section{Methodology}
+\subsection{Data Preprocessing}
+The set of images does not need much preprocessing as the data is well
+organised and the images are clear enough. However, it might be useful
+to generate more data by applying transformations to the images, such as
+rotating slightly or adding noise in order to create more relevant data
+and thus strengthen.
+
+Additionally, it might be useful to analyse the position of the hand and
+fingers themselves to build a more robust model, though only further
+testing will tell.
+
+\subsection{Model}
+As the task needs to be done in real time, I first need to do object
+detection to find the hands which are forming the sign. One such model is
+YOLOv3\cite{yolo}, which is used for real time object detection and can
+probably be tuned specifically to find hands. Then, I would pass
+this information to the classification model.
+
+Considering sign language recognition is an image classification
+problem, a good model to use would be Convolutional Neural Networks
+(CNN), created and trained using PyTorch.
+
+\subsection{Evaluation}
+For this classification problem, all the classes have approximately the
+same frequency as they are just letters of the alphabet. Thus, accuracy
+should be a sufficient as a metric. I'm personally aiming for at least 85\%
+accuracy on over 26 classes.
+
+\begin{thebibliography}{3}
+
+  \bibitem{yolo}
+  Redmon, Joseph and Farhadi, Ali.
+  \textit{YOLOv3: An Incremental Improvement}.
+  arXiv:1804.02767, 2018.
+  \\\url{https://arxiv.org/pdf/1804.02767.pdf}
+
+  \bibitem{data-images}
+  Akash. \textit{ASL Alphabet}. Retrieved 2020-10-05.
+  \\\url{https://www.kaggle.com/grassknoted/asl-alphabet}
+
+  \bibitem{data-videos}
+  V. Athitsos, C. Neidle, S. Sclaroff, J. Nash, A. Stefan, Q. Yuan and
+  A. Thangali.
+  \textit{The ASL Lexicon Video Dataset}.
+  CVPR 2008 Workshop on Human Communicative Behaviour Analysis, 2008.
+  \\\url{http://vlm1.uta.edu/~athitsos/asl_lexicon/}
+
+\end{thebibliography}
+
+\end{document}
