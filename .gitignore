@@ -1,3 +1,10 @@
+/build/
+/data/
+
+*.zip
+*.jpg
+*.png
+
 *.log
 *.aux
 *.fls
