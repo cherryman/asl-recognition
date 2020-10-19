@@ -1,12 +1,25 @@
 .PHONY: help
 help:
-	@echo download    Download the necessary datasets.
-	@echo extract     Extract and merge all the datasets.
+	@echo "Available targets:"
+	@echo "  train    Train the model."
+	@echo "  check    Test the model's accuracy."
+	@echo ""
+	@echo "Dependencies:"
+	@echo "  kaggle-api"
+	@echo "  p7zip"
+	@echo "  rsync"
 
-.PHONY: download extract merge
+.PHONY: download extract merge train check
 download: build/ build/data1.zip build/data2.zip build/data3.zip
 extract: download build/data1 build/data2 build/data3
 merge: data/
+train: build/model.pth
+
+check:
+	./model.py test
+
+build/model.pth: ./model.py
+	./model.py train
 
 build/data1.zip:
 	kaggle datasets download grassknoted/asl-alphabet \

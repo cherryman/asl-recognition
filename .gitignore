@@ -1,9 +1,11 @@
 /build/
 /data/
+/test/
+
+__pycache__/
+*.pyc
 
 *.zip
-*.jpg
-*.png
 
 *.log
 *.aux
