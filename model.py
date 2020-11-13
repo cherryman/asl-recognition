@@ -181,16 +181,17 @@ def model_test(n: Net, dl: utils.data.DataLoader, classes, *, device=DEVICE):
 
 
 data = Data("data", seed=0)
-train_l, test_l = data.loaders(train_batch=32, test_batch=32)
-net = Net(len(data.classes)).to(DEVICE)
+net = None
 
-
-def model_eval(path: str):
+def model_eval(img: Image):
     global data, net
+    if net == None:
+        net = Net(len(data.classes)).to(DEVICE)
+        net.load_state_dict(t.load("./build/model.pth"))
+        net.eval()
 
-    img = imload(path)
+
     img = transform_test(img).unsqueeze(0).to(DEVICE)
-
     outputs = net(img)
     _, y_pred = t.max(outputs.data, 1)
     return data.classes[y_pred[0].item()]
@@ -198,6 +199,9 @@ def model_eval(path: str):
 
 if __name__ == "__main__":
     print(f"Device: {DEVICE}")
+
+    net = Net(len(data.classes)).to(DEVICE)
+    train_l, test_l = data.loaders(train_batch=32, test_batch=32)
 
     if sys.argv[1] == "train":
         model_train(net, train_l)
@@ -208,7 +212,8 @@ if __name__ == "__main__":
         model_test(net, test_l, data.classes)
     elif sys.argv[1] == "eval":
         net.load_state_dict(t.load("./build/model.pth"))
-        print(model_eval(sys.argv[2]))
+        img = imload(sys.argv[2])
+        print(model_eval(img))
         imshow(transform_test(imload(sys.argv[2])))
     elif sys.argv[1] == "show":
         for x, y in train_l:
