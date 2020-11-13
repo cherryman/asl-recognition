@@ -1,0 +1,22 @@
+html,
+body {
+  margin: 0;
+}
+
+body {
+  width: 100%;
+  display: flex;
+  flex-flow: column nowrap;
+  justify-content: center;
+  align-items: center;
+}
+
+canvas {
+  display: none;
+}
+
+video {
+  display: block;
+  width: 640px;
+  height: 480px;
+}
