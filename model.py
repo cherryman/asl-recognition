@@ -2,6 +2,7 @@
 
 import sys
 from PIL import Image
+import numpy as np
 import matplotlib.pyplot as plt
 import sklearn.datasets
 import sklearn.model_selection
@@ -92,17 +93,19 @@ class Net(nn.Module):
         super(Net, self).__init__()
         self.to(device=device)
 
-        self.conv1 = nn.Conv2d(3, 6, 5)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.fc1 = nn.Linear(16 * 29 * 29, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, dout)
+        self.pool = nn.MaxPool2d(2)
+        self.conv1 = nn.Conv2d(3, 32, 3)
+        self.conv2 = nn.Conv2d(32, 64, 3)
+        self.conv3 = nn.Conv2d(64, 64, 3)
+        self.fc1 = nn.Linear(64 * 14 * 14, 128)
+        self.fc2 = nn.Linear(128, 64)
+        self.fc3 = nn.Linear(64, dout)
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 16 * 29 * 29)
+        x = self.pool(F.relu(self.conv3(x)))
+        x = x.view(-1, 64 * 14 * 14)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
@@ -111,9 +114,10 @@ class Net(nn.Module):
 
 def model_train(n: Net, dl: utils.data.DataLoader, *, device=DEVICE):
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(n.parameters(), lr=0.001, momentum=0.9)
+    optimizer = optim.SGD(n.parameters(), lr=0.001, momentum=0.9, weight_decay=1e-4)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.5)
 
-    epochs = 40
+    epochs = 30
     for epoch in range(epochs):
 
         running_loss = 0.0
@@ -125,9 +129,10 @@ def model_train(n: Net, dl: utils.data.DataLoader, *, device=DEVICE):
             loss = criterion(y_preds, y)
             loss.backward()
             optimizer.step()
+            scheduler.step()
 
             running_loss += loss.item()
-            if i % 100 == 0:
+            if i % 200 == 0:
                 print(
                     "[{:2}, {:5}, {:3.0f}%] loss: {:5.2f}".format(
                         epoch + 1,
@@ -144,6 +149,7 @@ def model_test(n: Net, dl: utils.data.DataLoader, classes, *, device=DEVICE):
     total = 0
     class_correct = [0] * len(classes)
     class_total = [0] * len(classes)
+    confusion = np.zeros((len(classes), len(classes)), dtype=np.int32)
 
     for x, y in dl:
         x, y = x.to(device), y.to(device)
@@ -158,15 +164,24 @@ def model_test(n: Net, dl: utils.data.DataLoader, classes, *, device=DEVICE):
         for i, l in enumerate(y.tolist()):
             class_total[l] += 1
             class_correct[l] += c[i].item()
+            confusion[y_pred[i]][y[i]] += 1
 
     print(f"Accuracy: {100. * correct / total:4.1f}% on {total}")
 
     for cat, cor, tot in zip(classes, class_correct, class_total):
         print(f" {cat}: {100. * cor / tot:6.2f}% on {tot:4}")
 
+    # Print confusion matrix
+    print("")
+    print("Prediction \\ Actual")
+    print(f"    {'   '.join(classes)}")
+    for i, l in enumerate(classes):
+        print(f"{l} ", end="")
+        print(" ".join(f"{x:3d}" for x in confusion[i]))
+
 
 data = Data("data", seed=0)
-train_l, test_l = data.loaders(train_batch=32, test_batch=256)
+train_l, test_l = data.loaders(train_batch=32, test_batch=32)
 net = Net(len(data.classes)).to(DEVICE)
 
 
@@ -177,12 +192,13 @@ def model_eval(path: str):
     img = transform_test(img).unsqueeze(0).to(DEVICE)
 
     outputs = net(img)
-    print(outputs)
     _, y_pred = t.max(outputs.data, 1)
     return data.classes[y_pred[0].item()]
 
 
 if __name__ == "__main__":
+    print(f"Device: {DEVICE}")
+
     if sys.argv[1] == "train":
         model_train(net, train_l)
         t.save(net.state_dict(), "./build/model.pth")
@@ -192,8 +208,8 @@ if __name__ == "__main__":
         model_test(net, test_l, data.classes)
     elif sys.argv[1] == "eval":
         net.load_state_dict(t.load("./build/model.pth"))
-        # imshow(transform_test(imload(sys.argv[2])))
         print(model_eval(sys.argv[2]))
+        imshow(transform_test(imload(sys.argv[2])))
     elif sys.argv[1] == "show":
         for x, y in train_l:
             for i, j in zip(x, y):
