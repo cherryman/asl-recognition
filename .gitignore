@@ -1,14 +1,19 @@
-/build/
-/data/
-/test/
-
+# Python
 __pycache__/
 *.pyc
 
-*.zip
-
+# Latex
 *.log
 *.aux
 *.fls
 *.out
 *.fdb_latexmk
+
+# Data
+*.zip
+*.jpg
+*.png
+
+/build/
+/data/
+/test/
