@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import sys
+import os
+from datetime import datetime
 from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
@@ -29,8 +31,8 @@ transform_test = transforms.Compose(
 transform_train = transforms.Compose(
     [
         transforms.ColorJitter(brightness=0.4, contrast=0.2, saturation=0.1, hue=0.1),
-        transforms.RandomRotation(10),
-        transforms.RandomResizedCrop(SIZE, scale=(0.8, 1.0), ratio=(0.95, 1.05)),
+        transforms.RandomRotation(15),
+        transforms.RandomResizedCrop(SIZE, scale=(0.8, 1.0), ratio=(0.90, 1.10)),
         transform_test,
     ]
 )
@@ -75,7 +77,7 @@ class Data:
         self.train = Dataset(x_train, y_train, transform=transform_train)
         self.test = Dataset(x_test, y_test, transform=transform_test)
 
-    def loaders(self, *, train_batch=32, test_batch=4, num_workers=0, device=DEVICE):
+    def loaders(self, *, train_batch=32, test_batch=32, num_workers=0, device=DEVICE):
         return tuple(
             utils.data.DataLoader(
                 d,
@@ -91,33 +93,72 @@ class Data:
 class Net(nn.Module):
     def __init__(self, dout, *, device=DEVICE):
         super(Net, self).__init__()
-        self.to(device=device)
 
-        self.pool = nn.MaxPool2d(2)
-        self.conv1 = nn.Conv2d(3, 32, 3)
-        self.conv2 = nn.Conv2d(32, 64, 3)
-        self.conv3 = nn.Conv2d(64, 64, 3)
-        self.fc1 = nn.Linear(64 * 14 * 14, 128)
-        self.fc2 = nn.Linear(128, 64)
-        self.fc3 = nn.Linear(64, dout)
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(3, 32, 3),
+            nn.ReLU(inplace=True),
+            nn.BatchNorm2d(32),
+            nn.Conv2d(32, 32, 3),
+            nn.ReLU(inplace=True),
+            nn.BatchNorm2d(32),
+            nn.MaxPool2d(2),
+            nn.Dropout(0.4),
+        )
+
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(32, 64, 3),
+            nn.ReLU(inplace=True),
+            nn.BatchNorm2d(64),
+            nn.Conv2d(64, 64, 3),
+            nn.ReLU(inplace=True),
+            nn.BatchNorm2d(64),
+            nn.MaxPool2d(2),
+            nn.Dropout(0.4),
+        )
+
+        self.conv3 = nn.Sequential(
+            nn.Conv2d(64, 128, 4),
+            nn.ReLU(inplace=True),
+            nn.BatchNorm2d(128),
+            nn.MaxPool2d(2),
+        )
+
+        self.lin = nn.Sequential(
+            nn.Linear(128 * 13 ** 2, 1024),
+            nn.ReLU(inplace=True),
+            nn.Linear(1024, 128),
+            nn.ReLU(inplace=True),
+            nn.Linear(128, dout),
+            nn.Softmax(dim=1),
+        )
 
     def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = self.pool(F.relu(self.conv3(x)))
-        x = x.view(-1, 64 * 14 * 14)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.conv3(x)
+        x = x.view(-1, 128 * 13 ** 2)
+        x = self.lin(x)
         return x
 
 
-def model_train(n: Net, dl: utils.data.DataLoader, *, device=DEVICE):
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(n.parameters(), lr=0.001, momentum=0.9, weight_decay=1e-4)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.5)
+def init_weights(m):
+    if type(m) == nn.Linear:
+        nn.init.xavier_uniform_(m.weight)
+        m.bias.data.fill_(0.01)
 
-    epochs = 30
+
+def model_train(n: Net, dl: utils.data.DataLoader, *, device=DEVICE):
+    n.to(device)
+    n.train()
+    n.apply(init_weights)
+
+    save_dir = f"./build/{datetime.now().isoformat(timespec='seconds')}/"
+    os.mkdir(save_dir)
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(n.parameters(), lr=0.001, momentum=0.9)
+
+    epochs = 150
     for epoch in range(epochs):
 
         running_loss = 0.0
@@ -129,7 +170,6 @@ def model_train(n: Net, dl: utils.data.DataLoader, *, device=DEVICE):
             loss = criterion(y_preds, y)
             loss.backward()
             optimizer.step()
-            scheduler.step()
 
             running_loss += loss.item()
             if i % 200 == 0:
@@ -143,8 +183,17 @@ def model_train(n: Net, dl: utils.data.DataLoader, *, device=DEVICE):
                 )
                 running_loss = 0.0
 
+        if epoch % 10 == 9:
+            save_file = os.path.join(
+                save_dir, f"epoch-{epoch + 1:03d}-loss-{running_loss:5.2f}.pt"
+            )
+            t.save(n.state_dict(), save_file)
+
 
 def model_test(n: Net, dl: utils.data.DataLoader, classes, *, device=DEVICE):
+    n.to(device)
+    n.eval()
+
     correct = 0
     total = 0
     class_correct = [0] * len(classes)
@@ -183,13 +232,14 @@ def model_test(n: Net, dl: utils.data.DataLoader, classes, *, device=DEVICE):
 data = Data("data", seed=0)
 net = None
 
+
 def model_eval(img: Image):
     global data, net
     if net == None:
         net = Net(len(data.classes)).to(DEVICE)
         net.load_state_dict(t.load("./build/model.pth"))
+        net.to(DEVICE)
         net.eval()
-
 
     img = transform_test(img).unsqueeze(0).to(DEVICE)
     outputs = net(img)
@@ -201,14 +251,16 @@ if __name__ == "__main__":
     print(f"Device: {DEVICE}")
 
     net = Net(len(data.classes)).to(DEVICE)
-    train_l, test_l = data.loaders(train_batch=32, test_batch=32)
+    train_l, test_l = data.loaders()
 
     if sys.argv[1] == "train":
         model_train(net, train_l)
         t.save(net.state_dict(), "./build/model.pth")
         print("Model saved to ./build/model.pth")
     elif sys.argv[1] == "test":
-        net.load_state_dict(t.load("./build/model.pth"))
+        path = "./build/model.pth" if len(sys.argv) < 3 else sys.argv[2]
+        print(path)
+        net.load_state_dict(t.load(path))
         model_test(net, test_l, data.classes)
     elif sys.argv[1] == "eval":
         net.load_state_dict(t.load("./build/model.pth"))
