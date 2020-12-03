@@ -13,7 +13,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils as utils
-import torchvision as tv
+import torchvision
 import torchvision.transforms as transforms
 
 DEVICE = t.device("cuda" if t.cuda.is_available() else "cpu")
@@ -147,13 +147,12 @@ def init_weights(m):
         m.bias.data.fill_(0.01)
 
 
-def model_train(n: Net, dl: utils.data.DataLoader, *, device=DEVICE):
+def model_train(n: nn.Module, dl: utils.data.DataLoader, *, device=DEVICE):
     n.to(device)
     n.train()
     n.apply(init_weights)
 
     save_dir = f"./build/{datetime.now().isoformat(timespec='seconds')}/"
-    os.mkdir(save_dir)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(n.parameters(), lr=0.001, momentum=0.9)
@@ -184,13 +183,16 @@ def model_train(n: Net, dl: utils.data.DataLoader, *, device=DEVICE):
                 running_loss = 0.0
 
         if epoch % 10 == 9:
+            if not os.path.exists(save_dir):
+                os.mkdir(save_dir)
+
             save_file = os.path.join(
                 save_dir, f"epoch-{epoch + 1:03d}-loss-{running_loss:5.2f}.pt"
             )
             t.save(n.state_dict(), save_file)
 
 
-def model_test(n: Net, dl: utils.data.DataLoader, classes, *, device=DEVICE):
+def model_test(n: nn.Module, dl: utils.data.DataLoader, classes, *, device=DEVICE):
     n.to(device)
     n.eval()
 
@@ -229,28 +231,45 @@ def model_test(n: Net, dl: utils.data.DataLoader, classes, *, device=DEVICE):
         print(" ".join(f"{x:3d}" for x in confusion[i]))
 
 
-data = Data("data", seed=0)
-net = None
+def new_net():
+    net = torchvision.models.vgg19(pretrained=True)
+    for param in net.parameters():
+        param.requires_grad = False
+    net.classifier = nn.Sequential(
+        nn.Linear(512 * 7 ** 2, 4096),
+        nn.ReLU(True),
+        nn.Dropout(),
+        nn.Linear(4096, 4096),
+        nn.ReLU(True),
+        nn.Dropout(),
+        nn.Linear(4096, len(data.classes)),
+    )
+    net.to(DEVICE)
+    return net
 
 
-def model_eval(img: Image):
-    global data, net
-    if net == None:
-        net = Net(len(data.classes)).to(DEVICE)
-        net.load_state_dict(t.load("./build/model.pth"))
-        net.to(DEVICE)
-        net.eval()
+def model_eval_prep(net, *, path="./build/model.pth"):
+    net.load_state_dict(t.load(path))
+    net.to(DEVICE)
+    net.eval()
+    return net
 
+
+def model_eval(net, img: Image):
     img = transform_test(img).unsqueeze(0).to(DEVICE)
-    outputs = net(img)
-    _, y_pred = t.max(outputs.data, 1)
-    return data.classes[y_pred[0].item()]
+    outputs = net(img)[0]
+    _, idx = t.topk(outputs.data, 5, sorted=True)
+    return [data.classes[i] for i in idx]
 
+
+data = None
+if data == None:
+    data = Data("data", seed=0)
 
 if __name__ == "__main__":
     print(f"Device: {DEVICE}")
 
-    net = Net(len(data.classes)).to(DEVICE)
+    net = new_net()
     train_l, test_l = data.loaders()
 
     if sys.argv[1] == "train":
@@ -263,7 +282,9 @@ if __name__ == "__main__":
         net.load_state_dict(t.load(path))
         model_test(net, test_l, data.classes)
     elif sys.argv[1] == "eval":
-        net.load_state_dict(t.load("./build/model.pth"))
+        path = "./build/model.pth" if len(sys.argv) < 4 else sys.argv[3]
+        print(path)
+        net.load_state_dict(t.load(path))
         img = imload(sys.argv[2])
         print(model_eval(img))
         imshow(transform_test(imload(sys.argv[2])))
