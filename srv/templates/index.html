@@ -6,7 +6,13 @@
   </head>
   <body onload="init('{{url_for('.eval')}}');">
     <h1>ASL Letter Classification</h1>
-    <video id="video"></video>
+    <main>
+      <video id="video"></video>
+      <div>
+        <h2>Top Results</h2>
+        <p id="results"></p>
+      </div>
+    </main>
     <canvas id="canvas"></canvas>
   </body>
 </html>

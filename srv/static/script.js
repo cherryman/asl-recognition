@@ -1,5 +1,6 @@
 let video = undefined;
 let canvas = undefined;
+let results = undefined;
 let ctx = undefined;
 let url = undefined;
 
@@ -40,12 +41,18 @@ function send() {
       width: video.videoWidth,
       height: video.videoHeight,
     }),
-  });
+  })
+    .then((r) => r.json())
+    .then((r) => {
+      results.innerText = r.data.join(", ");
+    })
+    .catch((e) => console.error(e));
 }
 
 function init(reqUrl) {
   video = document.getElementById("video");
   canvas = document.getElementById("canvas");
+  results = document.getElementById("results");
   ctx = canvas.getContext("2d");
   url = reqUrl;
 

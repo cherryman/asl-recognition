@@ -2,7 +2,7 @@ import io
 import base64
 from flask import Flask, Blueprint, render_template, request
 from PIL import Image
-from model import model_eval
+from model import new_net, model_eval_prep, model_eval
 
 bp = Blueprint("", __name__)
 
@@ -17,11 +17,10 @@ def create_app():
 def index():
     return render_template("index.html")
 
-
+net = model_eval_prep(new_net())
 @bp.route("/eval", methods=["POST"])
 def eval():
+    global net
     data = request.get_json()
     image = Image.open(io.BytesIO(base64.b64decode(data['data']))).convert("RGB")
-    image.save('./caca.jpg')
-    print(model_eval(image))
-    return {}
+    return {'data': model_eval(net, image)}

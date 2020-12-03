@@ -2,7 +2,6 @@ html,
 body {
   margin: 0;
 }
-
 body {
   width: 100%;
   display: flex;
@@ -10,13 +9,21 @@ body {
   justify-content: center;
   align-items: center;
 }
-
-canvas {
-  display: none;
+main {
+  display: flex;
+  flex-flow: row wrap;
+  justify-content: center;
+  align-items: flex-start;
 }
-
+main > div {
+  margin-left: 1rem;
+}
 video {
   display: block;
   width: 640px;
   height: 480px;
+  margin-right: 1rem;
+}
+canvas {
+  display: none;
 }
