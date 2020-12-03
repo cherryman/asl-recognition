@@ -30,7 +30,7 @@ transform_test = transforms.Compose(
 
 transform_train = transforms.Compose(
     [
-        transforms.ColorJitter(brightness=0.4, contrast=0.2, saturation=0.1, hue=0.1),
+        transforms.ColorJitter(brightness=0.4, contrast=0.2, saturation=0.2, hue=0.2),
         transforms.RandomRotation(15),
         transforms.RandomResizedCrop(SIZE, scale=(0.8, 1.0), ratio=(0.90, 1.10)),
         transform_test,
@@ -90,57 +90,6 @@ class Data:
         )
 
 
-class Net(nn.Module):
-    def __init__(self, dout, *, device=DEVICE):
-        super(Net, self).__init__()
-
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(3, 32, 3),
-            nn.ReLU(inplace=True),
-            nn.BatchNorm2d(32),
-            nn.Conv2d(32, 32, 3),
-            nn.ReLU(inplace=True),
-            nn.BatchNorm2d(32),
-            nn.MaxPool2d(2),
-            nn.Dropout(0.4),
-        )
-
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(32, 64, 3),
-            nn.ReLU(inplace=True),
-            nn.BatchNorm2d(64),
-            nn.Conv2d(64, 64, 3),
-            nn.ReLU(inplace=True),
-            nn.BatchNorm2d(64),
-            nn.MaxPool2d(2),
-            nn.Dropout(0.4),
-        )
-
-        self.conv3 = nn.Sequential(
-            nn.Conv2d(64, 128, 4),
-            nn.ReLU(inplace=True),
-            nn.BatchNorm2d(128),
-            nn.MaxPool2d(2),
-        )
-
-        self.lin = nn.Sequential(
-            nn.Linear(128 * 13 ** 2, 1024),
-            nn.ReLU(inplace=True),
-            nn.Linear(1024, 128),
-            nn.ReLU(inplace=True),
-            nn.Linear(128, dout),
-            nn.Softmax(dim=1),
-        )
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.conv2(x)
-        x = self.conv3(x)
-        x = x.view(-1, 128 * 13 ** 2)
-        x = self.lin(x)
-        return x
-
-
 def init_weights(m):
     if type(m) == nn.Linear:
         nn.init.xavier_uniform_(m.weight)
@@ -155,10 +104,10 @@ def model_train(n: nn.Module, dl: utils.data.DataLoader, *, device=DEVICE):
     save_dir = f"./build/{datetime.now().isoformat(timespec='seconds')}/"
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(n.parameters(), lr=0.001, momentum=0.9)
+    optimizer = optim.SGD(n.parameters(), lr=0.001, momentum=0.9, weight_decay=1e-4)
 
     epochs = 150
-    for epoch in range(epochs):
+    for epoch in range(1, epochs + 1):
 
         running_loss = 0.0
         for i, (x, y) in enumerate(dl, 1):
@@ -174,21 +123,19 @@ def model_train(n: nn.Module, dl: utils.data.DataLoader, *, device=DEVICE):
             if i % 200 == 0:
                 print(
                     "[{:2}, {:5}, {:3.0f}%] loss: {:5.2f}".format(
-                        epoch + 1,
+                        epoch,
                         i,
-                        100.0 * (i / len(dl) + epoch) / epochs,
+                        100.0 * (i / len(dl) + epoch - 1) / epochs,
                         running_loss,
                     )
                 )
                 running_loss = 0.0
 
-        if epoch % 10 == 9:
+        if epoch % 5 == 0:
             if not os.path.exists(save_dir):
                 os.mkdir(save_dir)
 
-            save_file = os.path.join(
-                save_dir, f"epoch-{epoch + 1:03d}-loss-{running_loss:5.2f}.pt"
-            )
+            save_file = os.path.join(save_dir, f"epoch-{epoch:03d}.pt")
             t.save(n.state_dict(), save_file)
 
 
