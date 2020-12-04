@@ -17,7 +17,7 @@ import torchvision
 import torchvision.transforms as transforms
 
 DEVICE = t.device("cuda" if t.cuda.is_available() else "cpu")
-SIZE = 128
+SIZE = 224
 
 transform_test = transforms.Compose(
     [
@@ -104,7 +104,7 @@ def model_train(n: nn.Module, dl: utils.data.DataLoader, *, device=DEVICE):
     save_dir = f"./build/{datetime.now().isoformat(timespec='seconds')}/"
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(n.parameters(), lr=0.001, momentum=0.9, weight_decay=1e-4)
+    optimizer = optim.SGD(n.parameters(), lr=0.001, momentum=0.9)
 
     epochs = 150
     for epoch in range(1, epochs + 1):
