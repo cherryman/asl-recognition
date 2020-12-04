@@ -1,2 +1,2 @@
-FLASK_APP="srv"
+FLASK_APP="server"
 FLASK_RUN_HOST="0.0.0.0"
