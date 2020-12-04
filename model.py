@@ -195,7 +195,7 @@ def new_net():
     return net
 
 
-def model_eval_prep(net, *, path="./build/model.pth"):
+def model_eval_prep(net, *, path="./model.pt"):
     net.load_state_dict(t.load(path))
     net.to(DEVICE)
     net.eval()
@@ -221,16 +221,14 @@ if __name__ == "__main__":
 
     if sys.argv[1] == "train":
         model_train(net, train_l)
-        t.save(net.state_dict(), "./build/model.pth")
-        print("Model saved to ./build/model.pth")
     elif sys.argv[1] == "test":
-        path = "./build/model.pth" if len(sys.argv) < 3 else sys.argv[2]
-        print(path)
+        path = "./model.pt" if len(sys.argv) < 3 else sys.argv[2]
+        print("Loading model file:", path)
         net.load_state_dict(t.load(path))
         model_test(net, test_l, data.classes)
     elif sys.argv[1] == "eval":
-        path = "./build/model.pth" if len(sys.argv) < 4 else sys.argv[3]
-        print(path)
+        path = "./model.pt" if len(sys.argv) < 4 else sys.argv[3]
+        print("Loading model file:", path)
         net.load_state_dict(t.load(path))
         img = imload(sys.argv[2])
         print(model_eval(img))

@@ -4,7 +4,7 @@ from flask import Flask, Blueprint, render_template, request
 from PIL import Image
 from model import new_net, model_eval_prep, model_eval
 
-net = model_eval_prep(new_net())
+net = model_eval_prep(new_net(), path="./model.pt")
 bp = Blueprint("", __name__)
 
 
